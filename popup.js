@@ -1,13 +1,78 @@
 let currentTabId = null;
 let lastTokenCount = 0;
+let settings = {
+  autoCleanupEnabled: false,
+  autoCleanupMinutes: 15,
+  tokenMaskingEnabled: false
+};
 
 // Get current tab ID
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
   if (tabs[0]) {
     currentTabId = tabs[0].id;
+    loadSettings();
     loadTokens();
   }
 });
+
+// Load settings
+function loadSettings() {
+  chrome.runtime.sendMessage({ action: 'getSettings' }, (response) => {
+    if (response) {
+      settings = response;
+      document.getElementById('autoCleanupEnabled').checked = settings.autoCleanupEnabled;
+      document.getElementById('autoCleanupMinutes').value = settings.autoCleanupMinutes;
+      document.getElementById('tokenMaskingEnabled').checked = settings.tokenMaskingEnabled;
+      updateAutoCleanupVisibility();
+    }
+  });
+}
+
+// Update visibility of auto-cleanup time input
+function updateAutoCleanupVisibility() {
+  const enabled = document.getElementById('autoCleanupEnabled').checked;
+  const container = document.getElementById('autoCleanupTimeContainer');
+  container.style.display = enabled ? 'block' : 'none';
+}
+
+// Mask token (show first 8 and last 8 characters)
+function maskToken(token) {
+  if (!settings.tokenMaskingEnabled || token.length <= 16) {
+    return token;
+  }
+  const firstPart = token.substring(0, 8);
+  const lastPart = token.substring(token.length - 8);
+  const middleLength = token.length - 16;
+  return `${firstPart}${'*'.repeat(Math.min(middleLength, 20))}${lastPart}`;
+}
+
+// Format expiration time
+function formatExpirationTime(expiresIn) {
+  if (expiresIn === null || expiresIn === undefined) {
+    return null;
+  }
+
+  if (expiresIn < 0) {
+    return { text: 'EXPIRED', class: 'token-expired' };
+  }
+
+  const minutes = Math.floor(expiresIn / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  // Warn if expiring in less than 1 hour
+  if (expiresIn < 3600) {
+    return { text: `Expires in ${minutes}m`, class: 'token-expiring-soon' };
+  }
+
+  if (days > 0) {
+    return { text: `${days}d ${hours % 24}h`, class: '' };
+  } else if (hours > 0) {
+    return { text: `${hours}h ${minutes % 60}m`, class: '' };
+  } else {
+    return { text: `${minutes}m`, class: '' };
+  }
+}
 
 // Listen for token captured messages from background script
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -110,18 +175,25 @@ function loadTokens() {
     tokensList.innerHTML = response.tokens.map((item, index) => {
       const date = new Date(item.timestamp);
       const timeStr = date.toLocaleTimeString();
+      const displayToken = maskToken(item.token);
+      const expiration = formatExpirationTime(item.expiresIn);
+
+      let expirationHtml = '';
+      if (expiration) {
+        expirationHtml = `<span class="${expiration.class}">${expiration.text}</span>`;
+      }
 
       return `
-        <div class="token-item">
+        <div class="token-item ${item.expired ? 'expired' : ''}">
           <div class="token-header">
-            <span class="timestamp">${timeStr}</span>
+            <span class="timestamp">${timeStr}${expirationHtml}</span>
             <button class="copy-btn" data-index="${index}">Copy Token</button>
           </div>
           <div class="token-metadata">
             <span class="token-type ${item.type}">${item.type}</span>
             <span class="token-url">${item.url}</span>
           </div>
-          <div class="token-value">${item.token}</div>
+          <div class="token-value ${settings.tokenMaskingEnabled ? 'token-masked' : ''}">${displayToken}</div>
         </div>
       `;
     }).join('');
@@ -152,5 +224,43 @@ setInterval(loadTokens, 2000);
 document.getElementById('urlInput').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') {
     document.getElementById('navigateBtn').click();
+  }
+});
+
+// Settings modal handlers
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('settingsModal').classList.add('visible');
+});
+
+document.getElementById('closeSettings').addEventListener('click', () => {
+  document.getElementById('settingsModal').classList.remove('visible');
+});
+
+document.getElementById('autoCleanupEnabled').addEventListener('change', updateAutoCleanupVisibility);
+
+document.getElementById('saveSettings').addEventListener('click', () => {
+  const newSettings = {
+    autoCleanupEnabled: document.getElementById('autoCleanupEnabled').checked,
+    autoCleanupMinutes: parseInt(document.getElementById('autoCleanupMinutes').value),
+    tokenMaskingEnabled: document.getElementById('tokenMaskingEnabled').checked
+  };
+
+  chrome.runtime.sendMessage({
+    action: 'saveSettings',
+    settings: newSettings
+  }, (response) => {
+    if (response && response.success) {
+      settings = newSettings;
+      document.getElementById('settingsModal').classList.remove('visible');
+      showNotification('Settings saved successfully', 'success');
+      loadTokens(); // Reload to apply masking changes
+    }
+  });
+});
+
+// Close modal on background click
+document.getElementById('settingsModal').addEventListener('click', (e) => {
+  if (e.target.id === 'settingsModal') {
+    document.getElementById('settingsModal').classList.remove('visible');
   }
 });

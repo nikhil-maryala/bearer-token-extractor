@@ -1,6 +1,9 @@
 // Store captured tokens per tab (key is token, value is token info)
 const tokens = new Map();
 
+// Store cleanup timers per tab
+const cleanupTimers = new Map();
+
 // Decode JWT token to get payload
 function decodeJWT(token) {
   try {
@@ -34,6 +37,45 @@ function getTokenType(url, payload) {
   return 'Unknown';
 }
 
+// Check if token is expired
+function isTokenExpired(payload) {
+  if (!payload || !payload.exp) {
+    return false; // Can't determine expiration
+  }
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp < now;
+}
+
+// Get time until token expires (in seconds)
+function getTimeUntilExpiry(payload) {
+  if (!payload || !payload.exp) {
+    return null;
+  }
+  const now = Math.floor(Date.now() / 1000);
+  return payload.exp - now;
+}
+
+// Setup auto-cleanup timer for a tab
+function setupAutoCleanup(tabId) {
+  chrome.storage.local.get(['autoCleanupEnabled', 'autoCleanupMinutes'], (result) => {
+    if (result.autoCleanupEnabled) {
+      // Clear existing timer if any
+      if (cleanupTimers.has(tabId)) {
+        clearTimeout(cleanupTimers.get(tabId));
+      }
+
+      const minutes = result.autoCleanupMinutes || 15;
+      const timer = setTimeout(() => {
+        tokens.delete(tabId);
+        cleanupTimers.delete(tabId);
+        console.log(`Auto-cleaned tokens for tab ${tabId} after ${minutes} minutes`);
+      }, minutes * 60 * 1000);
+
+      cleanupTimers.set(tabId, timer);
+    }
+  });
+}
+
 // Listen for web requests
 chrome.webRequest.onBeforeSendHeaders.addListener(
   (details) => {
@@ -56,14 +98,21 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
             if (!tabTokens.has(token)) {
               const payload = decodeJWT(token);
               const tokenType = getTokenType(details.url, payload);
+              const expired = isTokenExpired(payload);
+              const expiresIn = getTimeUntilExpiry(payload);
 
               tabTokens.set(token, {
                 token: token,
                 url: details.url,
                 timestamp: new Date().toISOString(),
                 type: tokenType,
-                payload: payload
+                payload: payload,
+                expired: expired,
+                expiresIn: expiresIn
               });
+
+              // Setup auto-cleanup timer when first token is captured
+              setupAutoCleanup(details.tabId);
 
               // Send notification to popup that a new token was captured
               chrome.runtime.sendMessage({
@@ -86,10 +135,36 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
 // Clean up tokens when tab is closed
 chrome.tabs.onRemoved.addListener((tabId) => {
   tokens.delete(tabId);
+  // Clear cleanup timer
+  if (cleanupTimers.has(tabId)) {
+    clearTimeout(cleanupTimers.get(tabId));
+    cleanupTimers.delete(tabId);
+  }
 });
+
+// Validate URL to prevent dangerous protocols
+function isValidUrl(url) {
+  try {
+    const urlObj = new URL(url);
+    // Only allow http and https protocols
+    if (!['http:', 'https:'].includes(urlObj.protocol)) {
+      return false;
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  // Validate sender - only accept messages from extension pages
+  if (!sender.id || sender.id !== chrome.runtime.id) {
+    console.warn('Rejected message from unauthorized sender');
+    sendResponse({ success: false, error: 'Unauthorized sender' });
+    return false;
+  }
+
   if (request.action === 'getTokens') {
     const tabId = request.tabId;
     const tabTokens = tokens.get(tabId) || new Map();
@@ -101,10 +176,30 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     tokens.delete(tabId);
     sendResponse({ success: true });
   } else if (request.action === 'navigateToUrl') {
+    // Validate URL before navigation
+    if (!isValidUrl(request.url)) {
+      console.error('Invalid or dangerous URL:', request.url);
+      sendResponse({ success: false, error: 'Invalid URL - only HTTP/HTTPS allowed' });
+      return false;
+    }
     chrome.tabs.update(request.tabId, { url: request.url }, () => {
       sendResponse({ success: true });
     });
     return true; // Will respond asynchronously
+  } else if (request.action === 'getSettings') {
+    chrome.storage.local.get(['autoCleanupEnabled', 'autoCleanupMinutes', 'tokenMaskingEnabled'], (result) => {
+      sendResponse({
+        autoCleanupEnabled: result.autoCleanupEnabled || false,
+        autoCleanupMinutes: result.autoCleanupMinutes || 15,
+        tokenMaskingEnabled: result.tokenMaskingEnabled || false
+      });
+    });
+    return true;
+  } else if (request.action === 'saveSettings') {
+    chrome.storage.local.set(request.settings, () => {
+      sendResponse({ success: true });
+    });
+    return true;
   }
   return true;
 });

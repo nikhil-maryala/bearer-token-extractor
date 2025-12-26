@@ -1,12 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Bearer Token Extractor",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Extracts bearer tokens from API calls on any webpage",
   "permissions": [
     "webRequest",
     "activeTab",
-    "scripting"
+    "storage"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -26,13 +26,51 @@
     <div class="tokens-section">
       <div class="header">
         <h2>Captured Tokens</h2>
-        <button id="clearBtn" class="clear-btn">Clear All</button>
+        <div class="header-actions">
+          <button id="settingsBtn" class="settings-btn" title="Settings">⚙️</button>
+          <button id="clearBtn" class="clear-btn">Clear All</button>
+        </div>
       </div>
 
       <div id="tokensList"></div>
 
       <div id="noTokens" class="no-tokens">
         No bearer tokens captured yet. Navigate to a URL or browse to a page that makes API calls.
+      </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal" class="modal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Settings</h2>
+          <button id="closeSettings" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="autoCleanupEnabled">
+              <span>Auto-cleanup tokens</span>
+            </label>
+            <p class="setting-description">Automatically clear tokens after a specified time</p>
+          </div>
+
+          <div class="setting-item" id="autoCleanupTimeContainer">
+            <label for="autoCleanupMinutes">Cleanup after (minutes):</label>
+            <input type="number" id="autoCleanupMinutes" min="1" max="120" value="15">
+          </div>
+
+          <div class="setting-item">
+            <label>
+              <input type="checkbox" id="tokenMaskingEnabled">
+              <span>Mask tokens</span>
+            </label>
+            <p class="setting-description">Show only first and last 8 characters of tokens</p>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="saveSettings" class="save-btn">Save Settings</button>
+        </div>
       </div>
     </div>
   </div>

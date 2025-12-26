@@ -6,15 +6,24 @@ A Chrome extension that captures bearer tokens from API calls and displays them 
 
 ## Features
 
-- 🔍 Automatically captures unique bearer tokens from all HTTP requests
-- 🏷️ Detects and labels token types (IdToken, PortalPkceToken, UserAccessToken)
-- 🚀 Quick-nav buttons for UiPath environments (Alpha, Staging, Prod)
-- 🌐 Navigate to any URL directly from the extension
-- 📋 One-click copy to clipboard
-- 🕒 Timestamp tracking for each captured token
-- 🗑️ Clear all tokens with a single click
-- 🔄 Auto-refreshes token list every 2 seconds
-- 🔐 Memory-only storage (no persistence to disk)
+### Core Features
+- 🔍 **Automatically captures unique bearer tokens** from all HTTP requests
+- 🏷️ **Detects and labels token types** (IdToken, PortalPkceToken, UserAccessToken)
+- 🚀 **Quick-nav buttons** for UiPath environments (Alpha, Staging, Prod)
+- 🌐 **Navigate to any URL** directly from the extension
+- 📋 **One-click copy to clipboard**
+- 🕒 **Timestamp tracking** for each captured token
+- 🗑️ **Clear all tokens** with a single click
+- 🔄 **Auto-refreshes token list** every 2 seconds
+- 🔐 **Memory-only storage** (no persistence to disk)
+
+### Security Features
+- ⏰ **Token expiration warnings** - Visual indicators for expired and expiring tokens
+- 🎭 **Token masking** - Option to hide middle portion of tokens (show first/last 8 chars)
+- ⏱️ **Auto-cleanup timer** - Automatically clear tokens after configurable time (default: 15 minutes)
+- 🔒 **URL validation** - Prevents navigation to dangerous protocols (javascript:, data:, etc.)
+- 🛡️ **Sender validation** - Only accepts messages from extension pages
+- 🚫 **Minimal permissions** - Removed unused `scripting` permission (v1.1.0)
 
 ## Installation
 
@@ -61,6 +70,24 @@ The extension automatically detects and categorizes tokens:
 - **UserAccessToken** (Orange): Tokens with `client_id: 1119a927-10ab-4543-bd1a-ad6bfbbc27f4`
 - **Unknown** (Gray): Other bearer tokens that don't match known patterns
 
+### Settings (⚙️)
+Click the settings button to configure:
+
+1. **Auto-cleanup tokens**
+   - Enable automatic clearing of tokens after a specified time
+   - Configurable duration (1-120 minutes, default: 15 minutes)
+   - Helps prevent accidental token exposure from forgotten sessions
+
+2. **Token masking**
+   - Show only first and last 8 characters of tokens
+   - Example: `eyJhbGci...3NzYifQ`
+   - Useful when sharing screenshots or during screen recordings
+
+### Token Expiration Indicators
+- **Red "EXPIRED"** - Token has already expired
+- **Orange "Expires in Xm"** - Token expires in less than 1 hour
+- **Gray time display** - Token expiration time (days, hours, minutes)
+
 ## How It Works
 
 1. **Request Interception**: The extension uses Chrome's `webRequest.onBeforeSendHeaders` API to monitor all HTTP/HTTPS requests
@@ -94,13 +121,13 @@ When you install this extension, Chrome will request the following permissions. 
 - **Data collected**: Current tab ID and URL
 - **Mitigation**: Only accesses tab information, does not inject scripts or modify page content
 
-#### 3. `scripting` - **NOT USED** ⚠️
-- **Status**: Listed in manifest but NOT currently used by the extension
-- **What it would do**: Would allow injecting JavaScript into web pages
-- **Why it's listed**: Likely added during initial development but not removed
-- **Recommendation**: **Should be removed** in future versions
-- **Security impact**: HIGH if used - Can execute arbitrary JavaScript on web pages
-- **Current risk**: LOW - Permission is requested but not utilized in code
+#### 3. `storage` - **REQUIRED**
+- **What it does**: Allows the extension to save user preferences
+- **Why it's needed**: To persist settings (auto-cleanup, token masking preferences)
+- **What you're granting**: The extension can store configuration data locally
+- **Security impact**: LOW - Only stores user preferences, not sensitive data
+- **Data collected**: Settings (auto-cleanup enabled/time, token masking preference)
+- **Mitigation**: No sensitive data stored; settings are local-only
 
 #### 4. `host_permissions: <all_urls>` - **REQUIRED** ⚠️
 - **What it does**: Grants access to all websites (HTTP and HTTPS)
@@ -213,11 +240,36 @@ A detailed security analysis is available in [SECURITY.md](SECURITY.md), includi
 
 ## Known Limitations
 
-1. **Unused Permission**: `scripting` permission is requested but not used (will be removed in future version)
-2. **Broad Scope**: `<all_urls>` permission is very permissive (can be manually restricted)
-3. **No Token Validation**: Doesn't verify if tokens are valid or expired
-4. **No Encryption**: Tokens stored in plain text in memory (acceptable for dev tool)
-5. **Chrome Only**: Not compatible with Firefox or other browsers
+1. **Broad Scope**: `<all_urls>` permission is very permissive (can be manually restricted to specific domains)
+2. **No Encryption**: Tokens stored in plain text in memory (acceptable for dev tool, not transmitted)
+3. **Chrome Only**: Not compatible with Firefox or other browsers
+4. **JWT-only Expiration**: Expiration detection only works for JWT tokens with `exp` claim
+
+## Changelog
+
+### v1.1.0 (2025-12-26)
+**Security Improvements:**
+- ✅ Removed unused `scripting` permission
+- ✅ Added URL validation to prevent dangerous protocols (javascript:, data:, file:, etc.)
+- ✅ Added sender validation in message handlers
+- ✅ Implemented token expiration checking with visual warnings
+- ✅ Added auto-cleanup timer (configurable 1-120 minutes)
+- ✅ Added token masking option
+- ✅ Added `storage` permission for settings persistence
+
+**New Features:**
+- ⚙️ Settings modal for configuration
+- ⏰ Token expiration indicators (EXPIRED, expiring soon warnings)
+- 🎭 Token masking (show first/last 8 characters)
+- ⏱️ Auto-cleanup timer with configurable duration
+
+**Documentation:**
+- 📄 Comprehensive SECURITY.md with threat analysis
+- 📝 Detailed permissions disclosure in README
+- 🔍 Security best practices and compliance information
+
+### v1.0.0 (2025-12-26)
+- Initial release with core token capture functionality
 
 ## Recommendations
 
