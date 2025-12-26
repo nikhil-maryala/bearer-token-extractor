@@ -2,54 +2,275 @@
 
 A Chrome extension that captures bearer tokens from API calls and displays them in an easy-to-use popup interface.
 
+⚠️ **SECURITY WARNING**: This extension captures authentication credentials. Only use for authorized testing, development, and debugging. See [SECURITY.md](SECURITY.md) for detailed security analysis.
+
 ## Features
 
-- 🔍 Automatically captures bearer tokens from all HTTP requests
+- 🔍 Automatically captures unique bearer tokens from all HTTP requests
+- 🏷️ Detects and labels token types (IdToken, PortalPkceToken, UserAccessToken)
+- 🚀 Quick-nav buttons for UiPath environments (Alpha, Staging, Prod)
 - 🌐 Navigate to any URL directly from the extension
 - 📋 One-click copy to clipboard
 - 🕒 Timestamp tracking for each captured token
 - 🗑️ Clear all tokens with a single click
 - 🔄 Auto-refreshes token list every 2 seconds
+- 🔐 Memory-only storage (no persistence to disk)
 
 ## Installation
 
-1. Clone this repository or download the files
+### Prerequisites
+- Google Chrome browser (version 88 or higher)
+- Understanding of the security implications (see [Permissions](#permissions) section)
+- Authorization to test/debug on target websites
+
+### Steps
+1. Clone this repository or download the files:
+   ```bash
+   git clone https://github.com/nikhil-maryala/bearer-token-extractor.git
+   ```
 2. Open Chrome and navigate to `chrome://extensions/`
 3. Enable "Developer mode" in the top right corner
 4. Click "Load unpacked"
 5. Select the directory containing the extension files
+6. **Review the permissions warning** Chrome displays before confirming
 
 ## Usage
 
+### Quick Start with UiPath Environments
 1. Click the extension icon in your Chrome toolbar
-2. Enter a URL in the input field and click "Navigate" (or press Enter)
-3. The extension will automatically capture any bearer tokens from API calls made on the page
+2. Click one of the environment buttons:
+   - **Alpha**: Navigate to `https://alpha.uipath.com/portal_/home`
+   - **Staging**: Navigate to `https://staging.uipath.com/portal_/home`
+   - **Prod**: Navigate to `https://cloud.uipath.com/portal_/home`
+3. Tokens will be automatically captured and categorized by type
+
+### Manual Navigation
+1. Enter a URL in the input field and click "Navigate" (or press Enter)
+2. The extension will automatically capture any bearer tokens from API calls made on the page
+3. Each token is displayed with:
+   - **Token Type Badge**: IdToken, PortalPkceToken, UserAccessToken, or Unknown
+   - **Capture Time**: When the token was first seen
+   - **Source URL**: The API endpoint that used the token
 4. Click "Copy Token" to copy a specific token to your clipboard
 5. Click "Clear All" to remove all captured tokens
 
+### Token Types
+The extension automatically detects and categorizes tokens:
+- **IdToken** (Blue): Tokens from UiPath identity services (`id-alpha.uipath.com`, `id.uipath.com`, `id-staging.uipath.com`)
+- **PortalPkceToken** (Purple): Tokens with `client_id: 73ba6224-d591-4a4f-b3ab-508e646f2932`
+- **UserAccessToken** (Orange): Tokens with `client_id: 1119a927-10ab-4543-bd1a-ad6bfbbc27f4`
+- **Unknown** (Gray): Other bearer tokens that don't match known patterns
+
 ## How It Works
 
-The extension uses Chrome's `webRequest` API to intercept HTTP requests and extract bearer tokens from the `Authorization` header. Tokens are stored per tab and automatically cleaned up when tabs are closed.
+1. **Request Interception**: The extension uses Chrome's `webRequest.onBeforeSendHeaders` API to monitor all HTTP/HTTPS requests
+2. **Token Extraction**: When a request contains an `Authorization` header starting with `Bearer`, the token is extracted
+3. **JWT Decoding**: Bearer tokens are decoded as JWTs to extract payload information (client_id, etc.)
+4. **Type Detection**: Tokens are categorized based on the request URL and JWT payload contents
+5. **Memory Storage**: Tokens are stored in a Map data structure in memory, isolated per browser tab
+6. **Automatic Cleanup**: When a tab is closed, all associated tokens are immediately deleted from memory
+
+**Important**: Tokens are stored ONLY in memory and are NEVER written to disk, localStorage, or transmitted to external servers.
 
 ## Permissions
 
-- `webRequest`: To intercept and analyze HTTP requests
-- `activeTab`: To interact with the current tab
-- `scripting`: To execute scripts in the context of web pages
-- `<all_urls>`: To capture tokens from any website
+When you install this extension, Chrome will request the following permissions. **You must accept these permissions for the extension to function.**
+
+### Required Permissions Explained
+
+#### 1. `webRequest` - **REQUIRED**
+- **What it does**: Allows the extension to intercept and read HTTP request headers
+- **Why it's needed**: This is the core functionality - the extension must read the `Authorization` header to extract bearer tokens
+- **What you're granting**: The extension can see the headers (but not the body) of all HTTP requests your browser makes
+- **Security impact**: HIGH - The extension can see authentication tokens, cookies in headers, and URLs you visit
+- **Data collected**: Authorization headers containing bearer tokens
+- **Mitigation**: Tokens are only stored in memory and never transmitted externally
+
+#### 2. `activeTab` - **REQUIRED**
+- **What it does**: Provides access to the currently active browser tab
+- **Why it's needed**: To identify which tab tokens belong to and to enable navigation features
+- **What you're granting**: The extension can read the URL and basic metadata of your current tab
+- **Security impact**: LOW - Limited to the tab you're actively viewing
+- **Data collected**: Current tab ID and URL
+- **Mitigation**: Only accesses tab information, does not inject scripts or modify page content
+
+#### 3. `scripting` - **NOT USED** ⚠️
+- **Status**: Listed in manifest but NOT currently used by the extension
+- **What it would do**: Would allow injecting JavaScript into web pages
+- **Why it's listed**: Likely added during initial development but not removed
+- **Recommendation**: **Should be removed** in future versions
+- **Security impact**: HIGH if used - Can execute arbitrary JavaScript on web pages
+- **Current risk**: LOW - Permission is requested but not utilized in code
+
+#### 4. `host_permissions: <all_urls>` - **REQUIRED** ⚠️
+- **What it does**: Grants access to all websites (HTTP and HTTPS)
+- **Why it's needed**: To capture tokens from any website during development/testing
+- **What you're granting**: The extension can monitor network traffic on ALL websites you visit
+- **Security impact**: **VERY HIGH** - Broadest possible permission scope
+- **Data collected**: Authorization headers from all websites
+- **Mitigation**: Only headers are read; consider restricting to specific domains in production
+- **Alternative**: Can be manually restricted to `https://*.uipath.com/*` for production use
+
+### Permission Warnings During Installation
+
+When installing, Chrome will display warnings such as:
+- ✅ **"Read and change all your data on all websites"** - Due to `<all_urls>` and `webRequest`
+- ✅ **"Read your browsing history"** - Due to `webRequest` seeing URLs
+
+**These warnings are accurate.** This extension has broad access because it's designed as a development/testing tool.
+
+### How to Limit Permissions (Advanced)
+
+If you want to restrict the extension to only UiPath domains:
+
+1. Modify `manifest.json` and change:
+```json
+"host_permissions": [
+  "<all_urls>"
+]
+```
+
+To:
+```json
+"host_permissions": [
+  "https://*.uipath.com/*"
+]
+```
+
+2. Reload the extension in `chrome://extensions/`
+
+This will limit token capture to only UiPath domains.
+
+## Security & Privacy
+
+### What Data is Collected?
+- ✅ **Bearer tokens** from Authorization headers
+- ✅ **Request URLs** where tokens are used
+- ✅ **JWT payload data** (client_id, expiration, etc.)
+- ✅ **Timestamps** when tokens are captured
+- ❌ **NOT collected**: Request/response bodies, cookies, form data, passwords, personal information
+
+### Where is Data Stored?
+- ✅ **In memory only** (JavaScript Map object in service worker)
+- ✅ **Isolated per tab** (tokens from different tabs are kept separate)
+- ❌ **NOT stored**: On disk, in localStorage, in databases, in cloud services
+
+### Where is Data Sent?
+- ❌ **NOWHERE** - No external servers, no analytics, no telemetry
+- ✅ **100% local processing** - All data stays on your computer
+- ✅ **No network requests** made by the extension (except user-initiated navigation)
+
+### Data Retention
+- ✅ **Cleared on tab close** - Tokens automatically deleted when tab is closed
+- ✅ **Cleared on browser close** - All tokens deleted when browser is closed
+- ✅ **Manual clear** - User can clear tokens anytime with "Clear All" button
+
+### Security Best Practices
+
+#### ✅ DO:
+- Only install from trusted sources (official repository)
+- Use in development/testing environments only
+- Clear tokens after each testing session
+- Disable/remove extension when not actively using it
+- Only grant access to websites you're authorized to test
+- Review captured tokens before copying/sharing
+- Keep the extension updated
+
+#### ❌ DON'T:
+- Use on production systems or live user accounts
+- Share captured tokens with unauthorized parties
+- Leave extension enabled on shared/public computers
+- Install modified versions from unknown sources
+- Use for unauthorized access or malicious purposes
+- Ignore Chrome's permission warnings
+- Use on websites you don't own or have permission to test
+
+### Compliance
+
+- ✅ **GDPR**: No personal data transmitted or stored persistently
+- ✅ **Privacy**: No tracking, analytics, or external communication
+- ⚠️ **Use Case**: Intended for authorized testing and development only
+- ⚠️ **Risk Level**: HIGH - Handles sensitive authentication credentials
+
+### For Security Researchers & Auditors
+
+A detailed security analysis is available in [SECURITY.md](SECURITY.md), including:
+- Complete threat model and risk assessment
+- Identified vulnerabilities and mitigations
+- Code security review
+- Recommendations for hardening
+- Incident response procedures
 
 ## Files
 
-- `manifest.json`: Extension configuration
-- `background.js`: Service worker that captures tokens from requests
-- `popup.html`: User interface
-- `popup.css`: Styling
-- `popup.js`: Popup logic and interaction handling
+- `manifest.json`: Extension configuration and permissions
+- `background.js`: Service worker that intercepts requests and captures tokens
+- `popup.html`: User interface layout
+- `popup.css`: Styling and visual design
+- `popup.js`: UI logic and user interaction handling
+- `SECURITY.md`: Comprehensive security analysis and review
+- `README.md`: This file
 
-## Security Notice
+## Known Limitations
 
-This extension captures authentication tokens. Use it responsibly and only on websites you own or have permission to test. Do not share captured tokens with unauthorized parties.
+1. **Unused Permission**: `scripting` permission is requested but not used (will be removed in future version)
+2. **Broad Scope**: `<all_urls>` permission is very permissive (can be manually restricted)
+3. **No Token Validation**: Doesn't verify if tokens are valid or expired
+4. **No Encryption**: Tokens stored in plain text in memory (acceptable for dev tool)
+5. **Chrome Only**: Not compatible with Firefox or other browsers
+
+## Recommendations
+
+### For Individual Developers:
+- Use a separate Chrome profile for development/testing
+- Restrict `host_permissions` to only required domains
+- Uninstall when not actively developing
+- Never use with personal accounts on production services
+
+### For Organizations:
+- Deploy only to authorized developer machines
+- Use Chrome Enterprise policies to control extension installation
+- Audit extension usage through Chrome device management
+- Provide security training on proper usage
+- Consider building a signed/packaged version for internal use
+
+## Troubleshooting
+
+### Extension not capturing tokens?
+1. Check that the website is making requests with `Authorization: Bearer` headers
+2. Verify the extension is enabled in `chrome://extensions/`
+3. Reload the extension after making code changes
+4. Check browser console for errors (F12 → Console)
+
+### Permission denied errors?
+1. Ensure you accepted all permissions during installation
+2. Try removing and reinstalling the extension
+3. Check if Chrome Enterprise policies are blocking the extension
+
+### Tokens not showing up?
+1. Make sure you're on the correct tab
+2. Click "Clear All" and navigate to the page again
+3. Refresh the popup by closing and reopening it
+4. Check if tokens are actually being sent (open Network tab in DevTools)
+
+## Contributing
+
+Contributions are welcome! Please:
+1. Review [SECURITY.md](SECURITY.md) before submitting security-related changes
+2. Test thoroughly on multiple websites
+3. Update documentation for any permission or functionality changes
+4. Follow Chrome extension best practices
 
 ## License
 
-MIT
+MIT License - See LICENSE file for details
+
+## Disclaimer
+
+This tool is provided as-is for **authorized testing and development purposes only**. Users are responsible for:
+- Ensuring they have permission to test target websites
+- Protecting captured tokens from unauthorized access
+- Compliance with applicable laws and regulations
+- Proper handling of authentication credentials
+
+The authors are not responsible for misuse, unauthorized access, or security incidents resulting from use of this extension.
