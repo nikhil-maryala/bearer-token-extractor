@@ -217,26 +217,89 @@ This extension captures bearer tokens from HTTP Authorization headers and displa
 
 ## Permission Justifications
 
-Chrome may ask you to justify broad permissions. Here's what to say:
+Chrome will ask you to justify each permission individually. Copy the exact text below for each:
 
 ### webRequest Permission
+**Question**: "Why does your extension need the 'webRequest' permission?"
+
+**Your Answer**:
 ```
-Required to intercept HTTP request headers and extract bearer tokens from the Authorization header. This is the core functionality of the extension - developers use it to capture and inspect authentication tokens during development and testing.
+The webRequest permission is essential for the core functionality of this developer tool. It allows the extension to intercept and read HTTP request headers to extract bearer tokens from the Authorization header.
+
+Specific use case: When developers are testing UiPath Cloud Platform authentication flows, they need to capture and inspect bearer tokens (UserAccessToken, PortalPkceToken, IdToken) that are automatically sent in API requests. This extension reads these tokens from request headers in real-time and displays them in the popup interface.
+
+The extension:
+- Only reads request headers (specifically Authorization headers)
+- Does not modify, block, or redirect any requests
+- Does not send captured data to external servers
+- Operates entirely locally within the browser
+
+This is a development and debugging tool intended for authorized testing environments only.
 ```
 
 ### <all_urls> Host Permission
+**Question**: "Why does your extension need access to all websites?"
+
+**Your Answer**:
 ```
-Required to capture tokens from any website during development and testing. Developers may need to test authentication flows across various environments (alpha, staging, production) and different domains. The extension only reads Authorization headers and does not modify requests or responses.
+The <all_urls> host permission is required because developers need to capture authentication tokens across multiple environments and domains during development and testing.
+
+Specific scenarios:
+1. UiPath has multiple environments (alpha.uipath.com, staging.uipath.com, cloud.uipath.com)
+2. Developers test against different regional endpoints and custom domains
+3. Testing authentication flows may involve redirects across multiple domains
+4. API calls may be made to various backend services and microservices
+
+The extension needs broad access to capture tokens from wherever the developer is testing. However:
+- The extension only activates when the user explicitly opens the popup
+- Token capture is passive - no injection, modification, or blocking occurs
+- All processing happens locally - no data leaves the browser
+- Tokens are stored only in memory and cleared when tabs close
+
+Users can restrict this permission to specific domains if they only test on specific sites. The extension will work with any subset of URLs the user grants access to.
 ```
 
 ### activeTab Permission
+**Question**: "Why does your extension need the 'activeTab' permission?"
+
+**Your Answer**:
 ```
-Required to identify which browser tab tokens belong to, enabling proper token isolation and management per tab. This ensures tokens from different testing sessions don't mix.
+The activeTab permission is required for proper token isolation and session management.
+
+Specific functionality:
+1. Token Organization: The extension needs to identify which browser tab each captured token belongs to, so tokens from different testing sessions don't mix together
+2. Tab-specific Storage: Tokens are stored per tab ID, ensuring developers can test multiple environments simultaneously in different tabs
+3. Automatic Cleanup: When a tab is closed, the extension needs to know which tokens to remove from memory
+4. Context Awareness: The popup needs to display only tokens from the currently active tab
+
+Without activeTab, all tokens would be mixed together regardless of which site they came from, making the tool unusable for developers who test multiple environments concurrently.
+
+No content is injected into pages, and no page modifications occur.
 ```
 
 ### storage Permission
+**Question**: "Why does your extension need the 'storage' permission?"
+
+**Your Answer**:
 ```
-Required to persist user preferences (auto-cleanup timer settings, token masking preference) across browser sessions. No sensitive data is stored - only user configuration settings.
+The storage permission is used exclusively for saving user preferences and configuration settings across browser sessions.
+
+Specific data stored:
+1. Auto-cleanup timer setting (user's preferred duration: 1-120 minutes)
+2. Token masking preference (whether to hide middle portion of tokens)
+
+What is NOT stored:
+- Bearer tokens themselves (stored only in memory, never persisted)
+- Any authentication credentials
+- User browsing history
+- Any personal or sensitive data
+
+The storage permission uses chrome.storage.local which:
+- Stores data locally on the user's device only
+- Never syncs to cloud or external servers
+- Can be cleared by the user at any time through browser settings
+
+These saved preferences enhance user experience by remembering their security settings between browser sessions.
 ```
 
 ---
