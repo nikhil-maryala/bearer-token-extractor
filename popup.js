@@ -1,4 +1,5 @@
 let currentTabId = null;
+let lastTokenCount = 0;
 
 // Get current tab ID
 chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -7,6 +8,26 @@ chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
     loadTokens();
   }
 });
+
+// Listen for token captured messages from background script
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'tokenCaptured' && message.tabId === currentTabId) {
+    showNotification(`Bearer token captured! (${message.tokenCount} total)`, 'success');
+    loadTokens();
+  }
+});
+
+// Show notification function
+function showNotification(message, type = 'info') {
+  const notification = document.getElementById('notification');
+  notification.textContent = message;
+  notification.className = `notification ${type}`;
+
+  // Auto-hide after 3 seconds
+  setTimeout(() => {
+    notification.className = 'notification';
+  }, 3000);
+}
 
 // Navigate button handler
 document.getElementById('navigateBtn').addEventListener('click', () => {
@@ -22,16 +43,23 @@ document.getElementById('navigateBtn').addEventListener('click', () => {
     finalUrl = 'https://' + url;
   }
 
+  // Clear old tokens before navigating to new URL
   chrome.runtime.sendMessage({
-    action: 'navigateToUrl',
-    tabId: currentTabId,
-    url: finalUrl
-  }, (response) => {
-    if (response && response.success) {
-      document.getElementById('urlInput').value = '';
-      // Reload tokens after a short delay to catch new requests
-      setTimeout(loadTokens, 1000);
-    }
+    action: 'clearTokens',
+    tabId: currentTabId
+  }, () => {
+    // Navigate to the new URL
+    chrome.runtime.sendMessage({
+      action: 'navigateToUrl',
+      tabId: currentTabId,
+      url: finalUrl
+    }, (response) => {
+      if (response && response.success) {
+        document.getElementById('urlInput').value = '';
+        // Reload tokens display
+        loadTokens();
+      }
+    });
   });
 });
 

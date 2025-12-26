@@ -25,6 +25,15 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
                 url: details.url,
                 timestamp: new Date().toISOString()
               });
+
+              // Send notification to popup that a new token was captured
+              chrome.runtime.sendMessage({
+                action: 'tokenCaptured',
+                tabId: details.tabId,
+                tokenCount: tabTokens.length
+              }).catch(() => {
+                // Popup might not be open, ignore error
+              });
             }
           }
         }
