@@ -1,6 +1,6 @@
 # Bearer Token Extractor
 
-A Chrome extension that captures bearer tokens from API calls and displays them in an easy-to-use popup interface.
+A Chrome extension primarily designed for **UiPath token extraction** - captures bearer tokens (UserAccessToken, PortalPkceToken, IdToken) from API calls and displays them in an easy-to-use popup interface. Perfect for UiPath developers and testers working with UiPath Cloud Platform authentication.
 
 ⚠️ **SECURITY WARNING**: This extension captures authentication credentials. Only use for authorized testing, development, and debugging. See [SECURITY.md](SECURITY.md) for detailed security analysis.
 
