@@ -29,6 +29,35 @@ function showNotification(message, type = 'info') {
   }, 3000);
 }
 
+// Function to navigate to URL
+function navigateToUrl(url) {
+  // Clear old tokens before navigating to new URL
+  chrome.runtime.sendMessage({
+    action: 'clearTokens',
+    tabId: currentTabId
+  }, () => {
+    // Navigate to the new URL
+    chrome.runtime.sendMessage({
+      action: 'navigateToUrl',
+      tabId: currentTabId,
+      url: url
+    }, (response) => {
+      if (response && response.success) {
+        // Reload tokens display
+        loadTokens();
+      }
+    });
+  });
+}
+
+// Environment buttons handler
+document.querySelectorAll('.env-btn').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const url = e.target.dataset.url;
+    navigateToUrl(url);
+  });
+});
+
 // Navigate button handler
 document.getElementById('navigateBtn').addEventListener('click', () => {
   const url = document.getElementById('urlInput').value.trim();
@@ -43,24 +72,8 @@ document.getElementById('navigateBtn').addEventListener('click', () => {
     finalUrl = 'https://' + url;
   }
 
-  // Clear old tokens before navigating to new URL
-  chrome.runtime.sendMessage({
-    action: 'clearTokens',
-    tabId: currentTabId
-  }, () => {
-    // Navigate to the new URL
-    chrome.runtime.sendMessage({
-      action: 'navigateToUrl',
-      tabId: currentTabId,
-      url: finalUrl
-    }, (response) => {
-      if (response && response.success) {
-        document.getElementById('urlInput').value = '';
-        // Reload tokens display
-        loadTokens();
-      }
-    });
-  });
+  document.getElementById('urlInput').value = '';
+  navigateToUrl(finalUrl);
 });
 
 // Clear button handler
@@ -104,7 +117,10 @@ function loadTokens() {
             <span class="timestamp">${timeStr}</span>
             <button class="copy-btn" data-index="${index}">Copy Token</button>
           </div>
-          <div class="token-url">${item.url}</div>
+          <div class="token-metadata">
+            <span class="token-type ${item.type}">${item.type}</span>
+            <span class="token-url">${item.url}</span>
+          </div>
           <div class="token-value">${item.token}</div>
         </div>
       `;
