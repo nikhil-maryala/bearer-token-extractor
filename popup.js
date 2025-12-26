@@ -172,7 +172,19 @@ function loadTokens() {
 
     noTokens.classList.remove('visible');
 
-    tokensList.innerHTML = response.tokens.map((item, index) => {
+    // Sort tokens by priority: UserAccessToken > PortalPkceToken > IdToken > Unknown
+    const tokenPriority = {
+      'UserAccessToken': 1,
+      'PortalPkceToken': 2,
+      'IdToken': 3,
+      'Unknown': 4
+    };
+
+    const sortedTokens = response.tokens.sort((a, b) => {
+      return tokenPriority[a.type] - tokenPriority[b.type];
+    });
+
+    tokensList.innerHTML = sortedTokens.map((item, index) => {
       const date = new Date(item.timestamp);
       const timeStr = date.toLocaleTimeString();
       const displayToken = maskToken(item.token);
@@ -183,11 +195,14 @@ function loadTokens() {
         expirationHtml = `<span class="${expiration.class}">${expiration.text}</span>`;
       }
 
+      // Find original index in response.tokens for copy functionality
+      const originalIndex = response.tokens.findIndex(t => t.token === item.token);
+
       return `
         <div class="token-item ${item.expired ? 'expired' : ''}">
           <div class="token-header">
             <span class="timestamp">${timeStr}${expirationHtml}</span>
-            <button class="copy-btn" data-index="${index}">Copy Token</button>
+            <button class="copy-btn" data-index="${originalIndex}">Copy Token</button>
           </div>
           <div class="token-metadata">
             <span class="token-type ${item.type}">${item.type}</span>
