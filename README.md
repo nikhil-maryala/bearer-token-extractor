@@ -326,3 +326,13 @@ This tool is provided as-is for **authorized testing and development purposes on
 - Proper handling of authentication credentials
 
 The authors are not responsible for misuse, unauthorized access, or security incidents resulting from use of this extension.
+
+### Trademark and Affiliation Notice
+
+This extension is **not affiliated with, endorsed by, or associated with**:
+- JWT.io
+- Auth0, Inc.
+- The JSON Web Token (JWT) specification or working groups
+- Any other authentication service or identity provider
+
+The JWT icon is used solely to represent the token extraction functionality of this development tool. JWT® is a registered trademark. All trademarks, logos, and brand names are the property of their respective owners.
