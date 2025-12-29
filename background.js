@@ -200,6 +200,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
     });
     return true;
+  } else if (request.action === 'fetchTenants') {
+    chrome.scripting.executeScript({
+      target: { tabId: request.tabId },
+      world: 'MAIN',
+      func: () => {
+        try {
+          const account = PortalShell.AccountAndTenants.getCachedAccount();
+          if (account && account.tenants) {
+            return account.tenants.map(t => ({
+              tenantName: t.tenantName || t.name || 'Unknown',
+              tenantId: t.tenantId || t.id || 'Unknown'
+            }));
+          }
+          return null;
+        } catch (e) {
+          return { error: e.message };
+        }
+      }
+    }).then((results) => {
+      if (results && results[0] && results[0].result) {
+        sendResponse({ success: true, tenants: results[0].result });
+      } else {
+        sendResponse({ success: false, error: 'No tenant data found' });
+      }
+    }).catch((error) => {
+      sendResponse({ success: false, error: error.message });
+    });
+    return true;
   }
   return true;
 });

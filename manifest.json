@@ -1,15 +1,19 @@
 {
   "manifest_version": 3,
   "name": "Bearer Token Extractor",
-  "version": "1.1.0",
-  "description": "UiPath token extractor - Captures bearer tokens (UserAccessToken, PortalPkceToken, IdToken) from API calls",
+  "version": "1.2.0",
+  "description": "UiPath token extractor - Captures bearer tokens and tenant information from UiPath portal",
   "permissions": [
     "webRequest",
     "activeTab",
-    "storage"
+    "storage",
+    "scripting"
   ],
   "host_permissions": [
-    "<all_urls>"
+    "https://*.uipath.com/*",
+    "https://alpha.uipath.com/*",
+    "https://staging.uipath.com/*",
+    "https://cloud.uipath.com/*"
   ],
   "background": {
     "service_worker": "background.js"

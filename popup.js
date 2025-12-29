@@ -279,3 +279,69 @@ document.getElementById('settingsModal').addEventListener('click', (e) => {
     document.getElementById('settingsModal').classList.remove('visible');
   }
 });
+
+// Fetch tenants button handler
+document.getElementById('fetchTenantsBtn').addEventListener('click', () => {
+  const btn = document.getElementById('fetchTenantsBtn');
+  btn.textContent = 'Fetching...';
+  btn.disabled = true;
+
+  chrome.runtime.sendMessage({
+    action: 'fetchTenants',
+    tabId: currentTabId
+  }, (response) => {
+    btn.textContent = 'Fetch Tenants';
+    btn.disabled = false;
+
+    if (response && response.success && response.tenants) {
+      if (response.tenants.error) {
+        showNotification('Error: ' + response.tenants.error, 'info');
+        return;
+      }
+      displayTenants(response.tenants);
+      showNotification(`Found ${response.tenants.length} tenant(s)`, 'success');
+    } else {
+      const errorMsg = response?.error || 'Could not fetch tenants. Make sure you are on a UiPath portal page.';
+      showNotification(errorMsg, 'info');
+    }
+  });
+});
+
+// Display tenants
+function displayTenants(tenants) {
+  const tenantsList = document.getElementById('tenantsList');
+  const noTenants = document.getElementById('noTenants');
+
+  if (!tenants || tenants.length === 0) {
+    tenantsList.innerHTML = '';
+    noTenants.classList.add('visible');
+    return;
+  }
+
+  noTenants.classList.remove('visible');
+
+  tenantsList.innerHTML = tenants.map((tenant, index) => `
+    <div class="tenant-item">
+      <div class="tenant-name">${tenant.tenantName}</div>
+      <div class="tenant-id-row">
+        <span class="tenant-id">${tenant.tenantId}</span>
+        <button class="copy-tenant-btn" data-tenant-id="${tenant.tenantId}">Copy ID</button>
+      </div>
+    </div>
+  `).join('');
+
+  // Add copy button handlers for tenant IDs
+  document.querySelectorAll('.copy-tenant-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const tenantId = e.target.dataset.tenantId;
+      navigator.clipboard.writeText(tenantId).then(() => {
+        e.target.textContent = 'Copied!';
+        e.target.classList.add('copied');
+        setTimeout(() => {
+          e.target.textContent = 'Copy ID';
+          e.target.classList.remove('copied');
+        }, 2000);
+      });
+    });
+  });
+}
